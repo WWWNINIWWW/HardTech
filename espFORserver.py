@@ -6,7 +6,7 @@ import getpass
 
 async def send_data(data, username_pc):
     try:
-        url = 'http://127.0.0.1:8000/data/'
+        url = 'https://hardtech-ibos.onrender.com/'+'data/'
         headers = {'Content-Type': 'application/json'}
         itens = data.split(';')
         payload = {

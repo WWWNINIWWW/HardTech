@@ -11,13 +11,12 @@ DATABASE_URL = "postgres://api_hardtech_user:3fFdulANPRs6jeDIqjmiBM5tlQMSJ2GC@dp
 conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 cursor = conn.cursor()
 
-# Criar tabela de usernames se não existir
+
 cursor.execute('''CREATE TABLE IF NOT EXISTS usernames
              (id SERIAL PRIMARY KEY, username_pc TEXT UNIQUE)''')
 conn.commit()
 
 
-# Criar tabela de dados se não existir
 cursor.execute('''CREATE TABLE IF NOT EXISTS data_items
              (id SERIAL PRIMARY KEY, username_id INTEGER, data TEXT, type_temperature TEXT, created_at TIMESTAMP,
              FOREIGN KEY(username_id) REFERENCES usernames(id))''')
@@ -31,23 +30,29 @@ class DataItem(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
 
 @app.post("/data/")
-async def save_data(data_item: DataItem):
-    username_pc = data_item.username_pc
-    data = data_item.data
-    type_temperature = data_item.type_temperature
+async def save_data(data_item: dict):
+    username_pc = data_item.get('username_pc')
+    data = data_item.get('data')
+    type_temperature = data_item.get('type_temperature')
     created_at = datetime.now()
 
-    cursor.execute("INSERT OR IGNORE INTO usernames (username_pc) VALUES (?)", (username_pc,))
-    conn.commit()
+    if not username_pc or not data or not type_temperature:
+        return {"message": "Invalid request, missing required fields"}
 
-    cursor.execute("SELECT id FROM usernames WHERE username_pc=?", (username_pc,))
+    try:
+        cursor.execute("INSERT INTO usernames (username_pc) VALUES (%s) ON CONFLICT (username_pc) DO NOTHING", (username_pc,))
+        conn.commit()
+    except psycopg2.IntegrityError:
+        pass
+
+    cursor.execute("SELECT id FROM usernames WHERE username_pc=%s", (username_pc,))
     username_id = cursor.fetchone()[0]
 
-    cursor.execute("INSERT INTO data_items (username_id, data, type_temperature, created_at) VALUES (?, ?, ?, ?)", (username_id, data, type_temperature, created_at))
+    cursor.execute("INSERT INTO data_items (username_id, data, type_temperature, created_at) VALUES (%s, %s, %s, %s)", (username_id, data, type_temperature, created_at))
     conn.commit()
-
     print(f"Received data: {data} from computer with username: {username_pc}")
     return {"message": "Data received and inserted into the database"}
+
 
 @app.get("/data/{username_pc}", response_model=List[DataItem])
 async def get_data_by_username(username_pc: str):

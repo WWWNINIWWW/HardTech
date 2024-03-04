@@ -11,14 +11,18 @@ DATABASE_URL = "postgres://api_hardtech_user:3fFdulANPRs6jeDIqjmiBM5tlQMSJ2GC@dp
 conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 cursor = conn.cursor()
 
+# Criar tabela de usernames se não existir
 cursor.execute('''CREATE TABLE IF NOT EXISTS usernames
-             (id INTEGER PRIMARY KEY AUTOINCREMENT, username_pc TEXT UNIQUE)''')
+             (id SERIAL PRIMARY KEY, username_pc TEXT UNIQUE)''')
 conn.commit()
 
+
+# Criar tabela de dados se não existir
 cursor.execute('''CREATE TABLE IF NOT EXISTS data_items
-             (id INTEGER PRIMARY KEY AUTOINCREMENT, username_id INTEGER, data REAL, type_temperature TEXT, created_at TEXT,
+             (id SERIAL PRIMARY KEY, username_id INTEGER, data TEXT, type_temperature TEXT, created_at TIMESTAMP,
              FOREIGN KEY(username_id) REFERENCES usernames(id))''')
 conn.commit()
+
 
 class DataItem(BaseModel):
     username_pc: str

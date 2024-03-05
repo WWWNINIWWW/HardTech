@@ -45,37 +45,23 @@ async def get_data_by_username(username_pc: str):
     data = [{"temperatura": row[0], "user": username_pc, "tipo": row[1], "created_at": row[2]} for row in rows]
     return {"data": data}
 
-@app.get("/temperature/{username_pc}", response_model=dict[str, Any])
+@app.get("/temperature/{username_pc}")
 async def get_average_temperature(username_pc: str):
-    with sqlite3.connect('example.db') as conn:
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT id FROM usernames WHERE username_pc=?", (username_pc,))
-        user_id = cursor.fetchone()
-        if not user_id:
-            return {"message": "User not found"}
-
-        cursor.execute("SELECT data, type_temperature, created_at FROM data_items WHERE username_id=?", (user_id[0],))
-        rows = cursor.fetchall()
-
-        daily_data = {}
-        for row in rows:
-            created_at = datetime.strptime(row[2], "%Y-%m-%d %H:%M:%S")
-            date_key = created_at.strftime("%Y-%m-%d")
-            if date_key not in daily_data:
-                daily_data[date_key] = {"total_temperature": 0, "temperature_count": 0, "date": date_key}
-            daily_data[date_key]["total_temperature"] += row[0]
-            daily_data[date_key]["temperature_count"] += 1
-
-        average_temperatures = {}
-        for date_key, data in daily_data.items():
-            average_temperatures[date_key] = {
-                "average_temperature": round(data["total_temperature"] / data["temperature_count"], 2),
-                "temperature_count": data["temperature_count"],
-                "date": data["date"]
-            }
-
-        return {"user": username_pc, "average_temperatures": average_temperatures}
+    cursor.execute("SELECT data, type_temperature, created_at FROM data_items JOIN usernames ON data_items.username_id = usernames.id WHERE usernames.username_pc=?", (username_pc,))
+    rows = cursor.fetchall()
+    daily_temperatures = {}
+    for row in rows:
+        temperature = float(row[0])
+        created_at = datetime.strptime(row[2], "%Y-%m-%d %H:%M:%S")
+        date_key = created_at.date().isoformat()
+        if date_key in daily_temperatures:
+            daily_temperatures[date_key]["total"] += temperature
+            daily_temperatures[date_key]["count"] += 1
+        else:
+            daily_temperatures[date_key] = {"total": temperature, "count": 1}
+    
+    daily_averages = {date: round(data["total"] / data["count"], 2) for date, data in daily_temperatures.items()}
+    return {"user": username_pc, "average_temperatures": {date: {"average_temperature": daily_averages[date], "temperature_count": daily_temperatures[date]["count"], "date": date} for date in daily_averages}}
 
 
 

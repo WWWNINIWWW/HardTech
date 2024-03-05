@@ -47,12 +47,12 @@ async def get_data_by_username(username_pc: str):
 
 @app.get("/temperature/{username_pc}")
 async def get_average_temperature(username_pc: str):
-    cursor.execute("SELECT data, type_temperature, created_at FROM data_items JOIN usernames ON data_items.username_id = usernames.id WHERE usernames.username_pc=?", (username_pc,))
+    cursor.execute("SELECT data, type_temperature, created_at FROM data_items JOIN usernames ON data_items.username_id = usernames.id WHERE usernames.username_pc=%s", (username_pc,))
     rows = cursor.fetchall()
     daily_temperatures = {}
     for row in rows:
         temperature = float(row[0])
-        created_at = datetime.strptime(row[2], "%Y-%m-%d %H:%M:%S")
+        created_at = row[2]
         date_key = created_at.date().isoformat()
         if date_key in daily_temperatures:
             daily_temperatures[date_key]["total"] += temperature

@@ -47,6 +47,12 @@ async def get_data_by_username(username_pc: str):
 
 @app.get("/temperature/{username_pc}")
 async def get_average_temperature(username_pc: str):
+    try:
+        cursor.execute("INSERT INTO usernames (username_pc) VALUES (?) ON CONFLICT DO NOTHING", (username_pc,))
+        conn.commit()
+    except psycopg2.errors.UniqueViolation:
+        pass
+
     cursor.execute("SELECT data, type_temperature, created_at FROM data_items JOIN usernames ON data_items.username_id = usernames.id WHERE usernames.username_pc=?", (username_pc,))
     rows = cursor.fetchall()
     daily_temperatures = {}
@@ -62,6 +68,7 @@ async def get_average_temperature(username_pc: str):
     
     daily_averages = {date: round(data["total"] / data["count"], 2) for date, data in daily_temperatures.items()}
     return {"user": username_pc, "daily_averages": daily_averages}
+
 
 @app.get("/usernames/")
 async def get_all_usernames():

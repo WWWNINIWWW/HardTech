@@ -1,95 +1,63 @@
-import sqlite3
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from typing import List
+from pydantic import BaseModel
+from datetime import datetime, timedelta
 import psycopg2
-from datetime import datetime
 
 app = FastAPI()
 
-DATABASE_URL = "postgres://api_hardtech_user:3fFdulANPRs6jeDIqjmiBM5tlQMSJ2GC@dpg-cnhoujgl6cac7394ttag-a/api_hardtech"
-conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+
+conn = psycopg2.connect(
+    dbname="api_hardtech",
+    user="api_hardtech_user",
+    password="3fFdulANPRs6jeDIqjmiBM5tlQMSJ2GC",
+    host="dpg-cnhoujgl6cac7394ttag-a",
+    port="5432"
+)
 cursor = conn.cursor()
-
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS usernames
-             (id SERIAL PRIMARY KEY, username_pc TEXT UNIQUE)''')
-conn.commit()
-
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS data_items
-             (id SERIAL PRIMARY KEY, username_id INTEGER, data TEXT, type_temperature TEXT, created_at TIMESTAMP,
-             FOREIGN KEY(username_id) REFERENCES usernames(id))''')
-conn.commit()
-
 
 class DataItem(BaseModel):
     username_pc: str
     data: float
     type_temperature: str
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime
 
 @app.post("/data/")
-async def save_data(data_item: dict):
-    username_pc = data_item.get('username_pc')
-    data = data_item.get('data')
-    type_temperature = data_item.get('type_temperature')
-    created_at = datetime.now()
-
-    if not username_pc or not data or not type_temperature:
-        return {"message": "Invalid request, missing required fields"}
-
+async def save_data(data_item: DataItem):
     try:
-        cursor.execute("INSERT INTO usernames (username_pc) VALUES (%s) ON CONFLICT (username_pc) DO NOTHING", (username_pc,))
+        cursor.execute("INSERT INTO usernames (username_pc) VALUES (%s) ON CONFLICT (username_pc) DO NOTHING", (data_item.username_pc,))
         conn.commit()
     except psycopg2.IntegrityError:
         pass
 
-    cursor.execute("SELECT id FROM usernames WHERE username_pc=%s", (username_pc,))
+    cursor.execute("SELECT id FROM usernames WHERE username_pc=%s", (data_item.username_pc,))
     username_id = cursor.fetchone()[0]
 
-    cursor.execute("INSERT INTO data_items (username_id, data, type_temperature, created_at) VALUES (%s, %s, %s, %s)", (username_id, data, type_temperature, created_at))
+    cursor.execute("INSERT INTO data_items (username_id, data, type_temperature, created_at) VALUES (%s, %s, %s, %s)",
+                   (username_id, data_item.data, data_item.type_temperature, data_item.created_at))
     conn.commit()
-    print(f"Received data: {data} from computer with username: {username_pc}")
+    print(f"Received data: {data_item.data} from computer with username: {data_item.username_pc}")
     return {"message": "Data received and inserted into the database"}
 
-
-@app.get("/data/{username_pc}", response_model=List[DataItem])
+@app.get("/data/{username_pc}")
 async def get_data_by_username(username_pc: str):
-    cursor.execute("SELECT data, type_temperature, created_at FROM data_items JOIN usernames ON data_items.username_id = usernames.id WHERE usernames.username_pc=?", (username_pc,))
+    cursor.execute("SELECT data, type_temperature, created_at FROM data_items JOIN usernames ON data_items.username_id = usernames.id WHERE usernames.username_pc=%s", (username_pc,))
     rows = cursor.fetchall()
-    return [{"data": row[0], "username_pc": username_pc, "type_temperature": row[1], "created_at": row[2]} for row in rows]
-
+    data = [{"temperatura": row[0], "user": username_pc, "tipo": row[1], "created_at": row[2]} for row in rows]
+    return {"data": data}
 
 @app.get("/temperature/{username_pc}")
 async def get_average_temperature(username_pc: str):
-    cursor.execute("SELECT data, created_at FROM data_items JOIN usernames ON data_items.username_id = usernames.id WHERE usernames.username_pc=?", (username_pc,))
+    cursor.execute("SELECT data FROM data_items JOIN usernames ON data_items.username_id = usernames.id WHERE usernames.username_pc=%s", (username_pc,))
     rows = cursor.fetchall()
+    temperatures = [float(row[0]) for row in rows]
+    if not temperatures:
+        return {"message": "No temperatures found for this user"}
+    average_temperature = sum(temperatures) / len(temperatures)
+    return {"user": username_pc, "average_temperature": round(average_temperature, 2), "total_temperatures": len(temperatures)}
 
-    temperatures_by_day = {}
-    for row in rows:
-        temperature = float(row[0])
-        created_at = row[1]
-        day = created_at.split(' ')[0] 
-        if day in temperatures_by_day:
-            temperatures_by_day[day].append(temperature)
-        else:
-            temperatures_by_day[day] = [temperature]
-
-    average_temperatures = {}
-    for day, temps in temperatures_by_day.items():
-        average_temperature = sum(temps) / len(temps) if temps else 0
-        average_temperatures[day] = {
-            "average_temperature": round(average_temperature, 2),
-            "temperature_count": len(temps),
-            "date": day
-        }
-
-    return {"user": username_pc, "average_temperatures": average_temperatures}
-
-
-@app.get("/usernames/", response_model=List[str])
+@app.get("/usernames/")
 async def get_all_usernames():
     cursor.execute("SELECT username_pc FROM usernames")
     rows = cursor.fetchall()
-    return [row[0] for row in rows]
+    usernames = [row[0] for row in rows]
+    return {"usernames": usernames}

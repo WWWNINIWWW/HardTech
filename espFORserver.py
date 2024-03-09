@@ -3,22 +3,28 @@ import serial
 import serial.tools.list_ports
 import requests
 import getpass
+import psutil
 
 async def send_data(data, username_pc):
     try:
-        url = 'https://hardtech-ibos.onrender.com/'+'data/'
+        url = 'https://hardtech-ibos.onrender.com/'+'PC/user/'
         headers = {'Content-Type': 'application/json'}
         itens = data.split(';')
         payload = {
-            'data': float(itens[0]),
-            'username_pc': username_pc,
-            'type_temperature': str(itens[1])
-            }
-        response = requests.post(url, headers=headers, json=payload)
-        print(response.text)
-    except Exception as e:
-        pass
+            'user': username_pc,
+            "dados": [
+                {
+                    'temperatura': float(itens[0]),
+                    'uso_CPU': float(psutil.cpu_percent(interval=1)),
+                    'uso_RAM': float(psutil.virtual_memory().percent)
+                }]
+        }
         
+        response = requests.post(url, headers=headers, json=payload)
+        #print(response.text)
+    except Exception as e:
+        print(e)
+        pass
 
 async def read_and_send(ser):
     while True:

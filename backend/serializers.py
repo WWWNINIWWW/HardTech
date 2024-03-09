@@ -9,9 +9,9 @@ class DadosSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = instance.data_recebimento.strftime('%d/%m/%Y %H:%M:%S')
         return {
-            'temperatura': str(instance.temperatura),
-            'uso_CPU': str(instance.uso_CPU),
-            'uso_RAM': str(instance.uso_RAM),
+            'temperatura': f"{instance.temperatura} ºC",
+            'uso_CPU': f"{instance.uso_CPU} %",
+            'uso_RAM': f"{instance.uso_RAM} %",
             'data_recebimento': data
         }
 

@@ -87,6 +87,9 @@ def media_view(request):
             values['media_uso_RAM'] /= values['count']
             values['media_uso_RAM'] = values['media_uso_RAM'].quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
             del values['count']
+            values['media_temperatura'] = f"{values['media_temperatura']} ºC"
+            values['media_uso_CPU'] = f"{values['media_uso_CPU']} %"
+            values['media_uso_RAM'] = f"{values['media_uso_RAM']} %"
 
     return Response(media_por_usuario_e_data)
 
@@ -126,5 +129,8 @@ def user_media_view(request, user):
             values['media_uso_RAM'] /= values['count']
             values['media_uso_RAM'] = values['media_uso_RAM'].quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
             del values['count']
+            values['media_temperatura'] = f"{values['media_temperatura']} ºC"
+            values['media_uso_CPU'] = f"{values['media_uso_CPU']} %"
+            values['media_uso_RAM'] = f"{values['media_uso_RAM']} %"
 
     return Response(media_por_usuario_e_data)

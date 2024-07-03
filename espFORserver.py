@@ -8,6 +8,7 @@ import psutil
 async def send_data(data, username_pc):
     try:
         url = 'https://hardtech-ibos.onrender.com/'+'PC/user/'
+        # url = 'http://127.0.0.1:8000/'+'PC/user/'
         headers = {'Content-Type': 'application/json'}
         itens = data.split(';')
         payload = {
@@ -21,7 +22,29 @@ async def send_data(data, username_pc):
         }
         
         response = requests.post(url, headers=headers, json=payload)
-        #print(response.text)
+        print(f'> {response.status_code} [POST] {url} - {payload}')
+        try: power: bool = response.json()['power']
+        except Exception as e: print(f'[!] < {e}')
+        if power:
+            print('Desligar')
+            r_put = requests.put(f'https://hardtech-ibos.onrender.com/PC/power/{username_pc}/', json={"power": False})
+            
+            if r_put.status_code == 200:
+                import platform
+                import os
+                sistema_operacional = platform.system()
+
+                if sistema_operacional == 'Windows':
+                    os.system('shutdown /s /t 1')
+                elif sistema_operacional == 'Linux' or sistema_operacional == 'Darwin':
+                    os.system('sudo shutdown now' if sistema_operacional == 'Linux' else 'sudo shutdown -h now')
+                else:
+                    print(f'Sistema operacional {sistema_operacional} não suportado para o desligamento.')
+
+            print('Desligado')
+        else:
+            print('não Desligar')
+        # print(f'< {response.text}')
     except Exception as e:
         print(e)
         pass
@@ -43,6 +66,7 @@ async def connect_to_esp32():
         ports = serial.tools.list_ports.comports()
         for port in ports:
             try:
+                # if port.device != 'COM1':
                 ser = serial.Serial(port.device, 115200, timeout=1)
                 print(f"> Conectado à porta serial {port.device}")
                 return ser

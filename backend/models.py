@@ -3,6 +3,7 @@ from django.utils import timezone
 
 class PC(models.Model):
     user = models.CharField(max_length=255, unique=True)
+    power = models.BooleanField(default=False)
 
 class Dados(models.Model):
     pc = models.ForeignKey(PC, related_name='dados', on_delete=models.CASCADE)

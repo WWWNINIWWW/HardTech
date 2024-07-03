@@ -20,7 +20,7 @@ class PCSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PC
-        fields = ['user', 'dados']
+        fields = ['user', 'power', 'dados']
 
     def create(self, validated_data):
         user = validated_data.pop('user')
@@ -33,3 +33,13 @@ class PCSerializer(serializers.ModelSerializer):
             Dados.objects.create(pc=pc, **dado_data)
 
         return pc
+
+class PCPowerUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PC
+        fields = ['power']
+
+    def update(self, instance, validated_data):
+        instance.power = validated_data.get('power', instance.power)
+        instance.save()
+        return instance

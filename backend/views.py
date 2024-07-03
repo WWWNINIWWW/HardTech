@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework import generics
 from backend.models import PC, Dados
-from backend.serializers import PCSerializer
+from backend.serializers import PCSerializer, PCPowerUpdateSerializer
 from rest_framework.decorators import api_view
 from django.db.models import Avg, DateTimeField
 from django.db.models.functions import TruncDate
@@ -38,6 +38,19 @@ class PCList(generics.ListCreateAPIView):
         serializer = self.get_serializer(pc)
         status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
         return Response(serializer.data, status=status_code)
+
+class PCPowerUpdateView(generics.UpdateAPIView):
+    queryset = PC.objects.all()
+    serializer_class = PCPowerUpdateSerializer
+    lookup_field = 'user'
+
+    def put(self, request, *args, **kwargs):
+        user = self.kwargs.get('user')
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()  # Aqui o serializer vai chamar o método update do PCPowerUpdateSerializer
+        return Response(serializer.data)
 
 
 class UserPCList(generics.ListAPIView):

@@ -4,3 +4,5 @@ db.sqlite3
 /media_root/
 .idea/
 venv/
+build/
+teste.py

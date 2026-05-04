@@ -1,16 +1,22 @@
+
 import asyncio
 import serial
 import serial.tools.list_ports
 import requests
 import getpass
 import psutil
+import platform
+import os
 
-async def send_data(data, username_pc):
+async def send_data(data, username_pc, ser):
     try:
-        url = 'https://hardtech-ibos.onrender.com/'+'PC/user/'
-        # url = 'http://127.0.0.1:8000/'+'PC/user/'
+        # Mantendo a rota de envio original
+        # url = 'https://hardtech-ibos.onrender.com/'+'PC/user/'
+        url = 'http://192.168.3.125:8080/PC/user/'
+        
         headers = {'Content-Type': 'application/json'}
         itens = data.split(';')
+        
         payload = {
             'user': username_pc,
             "dados": [
@@ -23,30 +29,41 @@ async def send_data(data, username_pc):
         
         response = requests.post(url, headers=headers, json=payload)
         print(f'> {response.status_code} [POST] {url} - {payload}')
-        try: power: bool = response.json()['power']
-        except Exception as e: print(f'[!] < {e}')
-        if power:
-            print('Desligar')
-            r_put = requests.put(f'https://hardtech-ibos.onrender.com/PC/power/{username_pc}/', json={"power": False})
-            
-            if r_put.status_code == 200:
-                import platform
-                import os
-                sistema_operacional = platform.system()
+        
+        # Só verifica se a requisição de envio funcionou (200 OK ou 201 Created)
+        if response.status_code in [200, 201]:
+            try: 
+                res_data = response.json()
+                update_flag = res_data.get('update', False)
+                mode_fan = res_data.get('mode_fan', 0)
+            except Exception as e: 
+                print(f'[!] Erro ao ler JSON da resposta: {e}')
+                update_flag = False
 
-                if sistema_operacional == 'Windows':
-                    os.system('shutdown /s /t 1')
-                elif sistema_operacional == 'Linux' or sistema_operacional == 'Darwin':
-                    os.system('sudo shutdown now' if sistema_operacional == 'Linux' else 'sudo shutdown -h now')
+            # Se update for True, envia o modo para a serial e reseta a flag
+            if update_flag:
+                print(f'> Update detectado! Modo da Fan recebido: {mode_fan}')
+                
+                # Monta o comando (ex: "FAN_MODE:1\n") e envia para o ESP32
+                comando = f"FAN_MODE:{mode_fan}\n"
+                ser.write(comando.encode('utf-8'))
+                print(f"> Comando enviado para o ESP32: {comando.strip()}")
+                
+                # Rota de PUT para resetar a flag update para False
+                # (Se o seu Django usar o prefixo /PC/, mude para /PC/fans/...)
+                url_update = f'http://192.168.3.125:8080/PC/fans/{username_pc}/update/'
+                
+                r_put = requests.put(url_update, json={"update": False})
+                
+                if r_put.status_code == 200:
+                    print("> Flag 'update' resetada para False no servidor.")
                 else:
-                    print(f'Sistema operacional {sistema_operacional} não suportado para o desligamento.')
-
-            print('Desligado')
-        else:
-            print('não Desligar')
-        # print(f'< {response.text}')
+                    print(f"> Falha ao resetar 'update'. Status: {r_put.status_code}")
+            else:
+                pass # Nenhuma atualização pendente
+            
     except Exception as e:
-        print(e)
+        print(f"Erro no send_data: {e}")
         pass
 
 async def read_and_send(ser):
@@ -54,22 +71,23 @@ async def read_and_send(ser):
         try:
             data = ser.readline().decode().strip()
             if data:
-                print(f"< {data}")
-                await send_data(data, username_pc=getpass.getuser())
+                print(f"< Recebido do ESP: {data}")
+                await send_data(data, username_pc=getpass.getuser(), ser=ser)
         except serial.SerialException:
             print("> Porta serial desconectada. Tentando reconectar...")
             ser.close()
             ser = await connect_to_esp32()
+            await asyncio.sleep(2) 
 
 async def connect_to_esp32():
     while True:
         ports = serial.tools.list_ports.comports()
         for port in ports:
             try:
-                # if port.device != 'COM1':
-                ser = serial.Serial(port.device, 115200, timeout=1)
-                print(f"> Conectado à porta serial {port.device}")
-                return ser
+                if port.device != 'COM1':
+                    ser = serial.Serial(port.device, 115200, timeout=1)
+                    print(f"> Conectado à porta serial {port.device}")
+                    return ser
             except serial.SerialException:
                 pass
         print("> Nenhuma porta serial encontrada. Tentando novamente em 1 segundo...")

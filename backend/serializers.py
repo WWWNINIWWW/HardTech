@@ -20,13 +20,12 @@ class PCSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PC
-        fields = ['user', 'power', 'dados']
+        fields = ['user', 'mode_fan', 'update', 'dados']
 
     def create(self, validated_data):
         user = validated_data.pop('user')
         dados_data = validated_data.pop('dados')
         
-
         pc, created = PC.objects.get_or_create(user=user)
 
         for dado_data in dados_data:
@@ -34,12 +33,28 @@ class PCSerializer(serializers.ModelSerializer):
 
         return pc
 
-class PCPowerUpdateSerializer(serializers.ModelSerializer):
+# --- Novos Serializers para o Fan Mode ---
+
+# Usado para visualizar o status de um ou todos os usuários
+class PCFanStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = PC
-        fields = ['power']
+        fields = ['user', 'mode_fan', 'update']
+
+# Usado no PUT para trocar o modo da Fan e ativar o update automaticamente
+class PCFanUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PC
+        fields = ['mode_fan']
 
     def update(self, instance, validated_data):
-        instance.power = validated_data.get('power', instance.power)
+        instance.mode_fan = validated_data.get('mode_fan', instance.mode_fan)
+        instance.update = True  # Troca automaticamente para True quando o modo altera
         instance.save()
         return instance
+
+# Usado no PUT para atualizar exclusivamente a variável update (ex: para voltar pra False)
+class PCUpdateFlagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PC
+        fields = ['update']
